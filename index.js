@@ -34,6 +34,38 @@ let connectionStats = {
   averageQueryTime: 0
 };
 
+// 心跳定时器
+let heartbeatTimer = null;
+
+// 心跳查询保持连接活跃
+async function startHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+  }
+  
+  heartbeatTimer = setInterval(async () => {
+    if (isConnectionActive()) {
+      try {
+        // 执行简单查询保持连接活跃
+        await connectionPool.request().query('SELECT 1 as heartbeat');
+        updateActivityTime();
+        console.log("💓 心跳检查成功");
+  } catch (error) {
+        console.log("💔 心跳检查失败，连接可能已断开");
+        // 不更新活动时间，让自动重连机制处理
+      }
+    }
+  }, 120000); // 每2分钟执行一次心跳
+}
+
+// 停止心跳
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
 // 自动断开连接检查器
 function startAutoDisconnectTimer() {
   if (autoDisconnectTimer) {
@@ -45,12 +77,15 @@ function startAutoDisconnectTimer() {
       const now = Date.now();
       const timeSinceLastActivity = now - lastActivityTime;
       
-      if (timeSinceLastActivity >= 10000) { // 10秒无活动
-        console.log("🔄 连接10秒无活动，自动断开...");
+      if (timeSinceLastActivity >= 300000) { // 5分钟无活动
+        console.log("🔄 连接5分钟无活动，自动断开...");
         await disconnectDatabase();
+      } else {
+        // 如果还没到时间，继续下一个检查周期
+        startAutoDisconnectTimer();
       }
     }
-  }, 10000);
+  }, 60000); // 每分钟检查一次
 }
 
 // 更新活动时间
@@ -83,8 +118,10 @@ async function connectDatabase(config) {
       },
       pool: {
         max: config.maxPoolSize || 10,
-        min: config.minPoolSize || 0,
-        idleTimeoutMillis: config.idleTimeout || 30000
+        min: config.minPoolSize || 1,
+        idleTimeoutMillis: config.idleTimeout || 600000, // 10分钟空闲超时
+        acquireTimeoutMillis: 60000,
+        createTimeoutMillis: 30000
       }
     };
     
@@ -98,6 +135,7 @@ async function connectDatabase(config) {
     connectionStats.lastConnectionTime = new Date().toISOString();
     
     updateActivityTime();
+    startHeartbeat(); // 启动心跳机制
     
     console.log(`✅ 成功连接到数据库: ${config.server}:${sqlConfig.port}/${config.database}`);
     return true;
@@ -123,6 +161,8 @@ async function disconnectDatabase() {
         autoDisconnectTimer = null;
       }
       
+      stopHeartbeat(); // 停止心跳机制
+      
       console.log("🔌 数据库连接已断开");
       return true;
     }
@@ -133,9 +173,30 @@ async function disconnectDatabase() {
   }
 }
 
+// 检查连接状态
+function isConnectionActive() {
+  return connectionPool && connectionPool.connected && !connectionPool.connecting;
+}
+
+// 重新连接数据库
+async function reconnectIfNeeded() {
+  if (!isConnectionActive() && connectionConfig) {
+    console.log("🔄 检测到连接断开，尝试重新连接...");
+    try {
+      await connectDatabase(connectionConfig);
+      return true;
+    } catch (error) {
+      console.error("❌ 重新连接失败:", error.message);
+      return false;
+    }
+  }
+  return isConnectionActive();
+}
+
 // 执行SQL查询
 async function executeQuery(sqlText, params = []) {
-  if (!connectionPool) {
+  // 检查连接状态，必要时重新连接
+  if (!await reconnectIfNeeded()) {
     throw new Error("未连接到数据库，请先使用 connect_database 工具建立连接");
   }
   
@@ -199,7 +260,7 @@ server.registerTool("connect_database", {
     connectionTimeout: z.number().min(1000).optional().default(30000).describe("连接超时时间(毫秒)"),
     maxPoolSize: z.number().min(1).max(100).optional().default(10).describe("连接池最大连接数"),
     minPoolSize: z.number().min(0).optional().default(0).describe("连接池最小连接数"),
-    idleTimeout: z.number().min(1000).optional().default(30000).describe("空闲连接超时时间(毫秒)")
+    idleTimeout: z.number().min(1000).optional().default(600000).describe("空闲连接超时时间(毫秒)")
   }
 }, async (params) => {
   try {
@@ -209,7 +270,7 @@ server.registerTool("connect_database", {
       content: [
         {
           type: "text",
-          text: `✅ 数据库连接成功！\n\n📊 连接信息:\n- 服务器: ${params.server}:${params.port}\n- 数据库: ${params.database}\n- 用户: ${params.user}\n- 加密: ${params.encrypt ? '启用' : '禁用'}\n- 连接池: ${params.minPoolSize}-${params.maxPoolSize}\n\n💡 提示:\n- 连接将在10秒无活动后自动断开\n- 使用 execute_sql 工具执行SQL查询\n- 使用 disconnect_database 工具手动断开连接`
+          text: `✅ 数据库连接成功！\n\n📊 连接信息:\n- 服务器: ${params.server}:${params.port}\n- 数据库: ${params.database}\n- 用户: ${params.user}\n- 加密: ${params.encrypt ? '启用' : '禁用'}\n- 连接池: ${params.minPoolSize}-${params.maxPoolSize}\n- 空闲超时: ${Math.round(params.idleTimeout/60000)}分钟\n\n💡 提示:\n- 连接将在5分钟无活动后自动断开\n- 连接断开时会自动重连\n- 使用 execute_sql 工具执行SQL查询\n- 使用 batch_execute_sql 工具批量执行\n- 使用 disconnect_database 工具手动断开连接`
         }
       ]
     };
@@ -304,8 +365,8 @@ server.registerTool("disconnect_database", {
     if (disconnected) {
       return {
         content: [
-          {
-            type: "text",
+          { 
+            type: "text", 
             text: `🔌 数据库连接已断开\n\n📊 本次会话统计:\n- 总查询次数: ${connectionStats.totalQueries}\n- 成功查询: ${connectionStats.successfulQueries}\n- 失败查询: ${connectionStats.failedQueries}\n- 平均查询时间: ${Math.round(connectionStats.averageQueryTime)}ms\n\n💡 提示:\n- 如需重新连接，使用 connect_database 工具\n- 连接信息已清除`
           }
         ]
@@ -313,8 +374,8 @@ server.registerTool("disconnect_database", {
     } else {
       return {
         content: [
-          {
-            type: "text",
+          { 
+            type: "text", 
             text: `ℹ️ 当前没有活跃的数据库连接\n\n💡 提示:\n- 使用 connect_database 工具建立新连接`
           }
         ]
@@ -351,6 +412,11 @@ server.registerTool("batch_execute_sql", {
   }
 }, async (params) => {
   try {
+    // 确保连接可用
+    if (!await reconnectIfNeeded()) {
+      throw new Error("未连接到数据库，请先使用 connect_database 工具建立连接");
+    }
+    
     const { sqlList, stopOnError = false, parallel = false } = params;
     const results = [];
     const startTime = Date.now();
@@ -512,11 +578,15 @@ server.registerTool("get_connection_status", {
     statusText += `- 数据库: ${connectionConfig.database}\n`;
     statusText += `- 用户: ${connectionConfig.user}\n`;
     
-    if (timeSinceLastActivity !== null) {
-      const secondsSinceActivity = Math.floor(timeSinceLastActivity / 1000);
-      statusText += `- 最后活动: ${secondsSinceActivity}秒前\n`;
-      statusText += `- 自动断开倒计时: ${Math.max(0, 10 - secondsSinceActivity)}秒\n`;
-    }
+          if (timeSinceLastActivity !== null) {
+        const minutesSinceActivity = Math.floor(timeSinceLastActivity / 60000);
+        const secondsSinceActivity = Math.floor((timeSinceLastActivity % 60000) / 1000);
+        statusText += `- 最后活动: ${minutesSinceActivity}分${secondsSinceActivity}秒前\n`;
+        const remainingTime = Math.max(0, 300 - Math.floor(timeSinceLastActivity / 1000));
+        const remainingMinutes = Math.floor(remainingTime / 60);
+        const remainingSeconds = remainingTime % 60;
+        statusText += `- 自动断开倒计时: ${remainingMinutes}分${remainingSeconds}秒\n`;
+      }
   } else {
     statusText += `🔴 连接状态: 未连接\n`;
   }
@@ -540,7 +610,8 @@ server.registerTool("get_connection_status", {
   
   statusText += `\n💡 提示:\n`;
   if (isConnected) {
-    statusText += `- 连接将在10秒无活动后自动断开\n`;
+    statusText += `- 连接将在5分钟无活动后自动断开\n`;
+    statusText += `- 连接断开时会自动重连\n`;
     statusText += `- 使用 execute_sql 工具执行查询\n`;
     statusText += `- 使用 batch_execute_sql 工具批量执行\n`;
     statusText += `- 使用 disconnect_database 工具手动断开\n`;
@@ -561,7 +632,7 @@ server.registerTool("get_connection_status", {
 // 启动服务器
 async function startServer() {
   try {
-    const transport = new StdioServerTransport();
+const transport = new StdioServerTransport();
     await server.connect(transport);
     console.log("🚀 MCP MSSQL 服务器已启动");
   } catch (error) {
@@ -573,6 +644,7 @@ async function startServer() {
 // 优雅关闭
 process.on('SIGINT', async () => {
   console.log("\n🔄 正在关闭服务器...");
+  stopHeartbeat();
   if (connectionPool) {
     await disconnectDatabase();
   }
@@ -581,6 +653,7 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.log("\n🔄 正在关闭服务器...");
+  stopHeartbeat();
   if (connectionPool) {
     await disconnectDatabase();
   }
