@@ -1,10 +1,11 @@
 {
   "name": "@zb2947244682/mcp-mssql",
   "version": "1.0.0",
-  "description": "MCP tool for MSSQL database operations",
+  "description": "用于MSSQL数据库操作的MCP工具",
+  "homepage": "https://github.com/zb2947244682",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zb2947244682/MCPMSSQL"
+    "url": "https://github.com/zb2947244682/mcp-mssql"
   },
   "main": "index.js",
   "type": "module",
