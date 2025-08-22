@@ -332,7 +332,168 @@ server.registerTool("disconnect_database", {
   }
 });
 
-// 注册工具4：获取连接状态
+// 注册工具4：批量执行SQL
+server.registerTool("batch_execute_sql", {
+  title: "批量执行SQL",
+  description: "批量执行多个SQL语句，返回每个SQL的执行结果",
+  inputSchema: {
+    sqlList: z.array(z.object({
+      id: z.string().optional().describe("SQL语句标识（可选）"),
+      sql: z.string().min(1, "SQL语句不能为空").describe("要执行的SQL语句"),
+      params: z.array(z.object({
+        name: z.string().describe("参数名称"),
+        type: z.any().describe("参数类型 (如: sql.VarChar, sql.Int等)"),
+        value: z.any().describe("参数值")
+      })).optional().default([]).describe("SQL参数 (可选)")
+    })).min(1, "至少需要一条SQL语句").describe("SQL语句列表"),
+    stopOnError: z.boolean().optional().default(false).describe("遇到错误时是否停止执行后续SQL"),
+    parallel: z.boolean().optional().default(false).describe("是否并行执行（注意：某些SQL可能不支持并行）")
+  }
+}, async (params) => {
+  try {
+    const { sqlList, stopOnError = false, parallel = false } = params;
+    const results = [];
+    const startTime = Date.now();
+    
+    if (parallel) {
+      // 并行执行
+      const promises = sqlList.map(async (sqlItem, index) => {
+        try {
+          const result = await executeQuery(sqlItem.sql, sqlItem.params || []);
+          return {
+            index: index + 1,
+            id: sqlItem.id || `SQL_${index + 1}`,
+            sql: sqlItem.sql,
+            success: true,
+            result: result,
+            error: null
+          };
+        } catch (error) {
+          return {
+            index: index + 1,
+            id: sqlItem.id || `SQL_${index + 1}`,
+            sql: sqlItem.sql,
+            success: false,
+            result: null,
+            error: error.message
+          };
+        }
+      });
+      
+      const parallelResults = await Promise.all(promises);
+      results.push(...parallelResults);
+    } else {
+      // 串行执行
+      for (let i = 0; i < sqlList.length; i++) {
+        const sqlItem = sqlList[i];
+        
+        try {
+          const result = await executeQuery(sqlItem.sql, sqlItem.params || []);
+          results.push({
+            index: i + 1,
+            id: sqlItem.id || `SQL_${index + 1}`,
+            sql: sqlItem.sql,
+            success: true,
+            result: result,
+            error: null
+          });
+        } catch (error) {
+          results.push({
+            index: i + 1,
+            id: sqlItem.id || `SQL_${index + 1}`,
+            sql: sqlItem.sql,
+            success: false,
+            result: null,
+            error: error.message
+          });
+          
+          if (stopOnError) {
+            break; // 遇到错误时停止执行
+          }
+        }
+      }
+    }
+    
+    const totalTime = Date.now() - startTime;
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.filter(r => !r.success).length;
+    
+    // 构建显示文本
+    let displayText = `✅ 批量SQL执行完成！\n\n📊 执行统计:\n`;
+    displayText += `- 总SQL数量: ${sqlList.length}\n`;
+    displayText += `- 成功执行: ${successCount}\n`;
+    displayText += `- 执行失败: ${errorCount}\n`;
+    displayText += `- 总执行时间: ${totalTime}ms\n`;
+    displayText += `- 执行模式: ${parallel ? '并行' : '串行'}\n`;
+    displayText += `- 错误处理: ${stopOnError ? '遇错停止' : '继续执行'}\n\n`;
+    
+    // 显示每个SQL的执行结果
+    displayText += `📋 详细执行结果:\n`;
+    displayText += `==========================================\n`;
+    
+    for (const result of results) {
+      displayText += `\n🔸 ${result.id} (第${result.index}条)\n`;
+      displayText += `SQL: ${result.sql.substring(0, 100)}${result.sql.length > 100 ? '...' : ''}\n`;
+      
+      if (result.success) {
+        displayText += `✅ 执行成功\n`;
+        displayText += `- 影响行数: ${result.result.rowsAffected}\n`;
+        displayText += `- 返回行数: ${result.result.rowCount}\n`;
+        displayText += `- 执行时间: ${result.result.queryTime}ms\n`;
+        
+        // 如果有返回数据，显示前几行
+        if (result.result.recordset && result.result.recordset.length > 0) {
+          const columns = Object.keys(result.result.recordset[0]);
+          displayText += `- 数据预览 (前${Math.min(result.result.recordset.length, 3)}行):\n`;
+          
+          for (let i = 0; i < Math.min(result.result.recordset.length, 3); i++) {
+            const row = result.result.recordset[i];
+            const values = columns.map(col => {
+              const value = row[col];
+              if (value === null || value === undefined) return 'NULL';
+              if (typeof value === 'string' && value.length > 30) return value.substring(0, 30) + '...';
+              return String(value);
+            });
+            displayText += `  ${i + 1}. ${values.join(' | ')}\n`;
+          }
+          
+          if (result.result.recordset.length > 3) {
+            displayText += `  ... 还有 ${result.result.recordset.length - 3} 行数据\n`;
+          }
+        }
+      } else {
+        displayText += `❌ 执行失败\n`;
+        displayText += `- 错误信息: ${result.error}\n`;
+      }
+      
+      displayText += `------------------------------------------\n`;
+    }
+    
+    displayText += `\n💡 提示:\n`;
+    displayText += `- 连接活动时间已更新\n`;
+    displayText += `- 如需断开连接，使用 disconnect_database 工具`;
+    
+    return {
+      content: [
+        {
+          type: "text",
+          text: displayText
+        }
+      ]
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `❌ 批量SQL执行失败: ${error.message}\n\n🔍 可能的原因:\n- 未连接到数据库\n- SQL语句格式错误\n- 参数配置错误\n\n💡 建议:\n- 检查数据库连接状态\n- 验证SQL语句语法\n- 确认参数配置`
+        }
+      ]
+    };
+  }
+});
+
+// 注册工具5：获取连接状态
 server.registerTool("get_connection_status", {
   title: "获取连接状态",
   description: "查看当前数据库连接状态和统计信息",
@@ -381,6 +542,7 @@ server.registerTool("get_connection_status", {
   if (isConnected) {
     statusText += `- 连接将在10秒无活动后自动断开\n`;
     statusText += `- 使用 execute_sql 工具执行查询\n`;
+    statusText += `- 使用 batch_execute_sql 工具批量执行\n`;
     statusText += `- 使用 disconnect_database 工具手动断开\n`;
   } else {
     statusText += `- 使用 connect_database 工具建立连接\n`;
