@@ -1,0 +1,36 @@
+{
+  "name": "@zb2947244682/mcp-mssql",
+  "version": "1.0.0",
+  "description": "MCP tool for MSSQL database operations",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zb2947244682/MCPMSSQL"
+  },
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "mcp-mssql": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "PUBLISHING.md"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "MCP",
+    "MSSQL",
+    "SQL Server",
+    "database",
+    "connection"
+  ],
+  "author": "简单生活",
+  "license": "ISC",
+  "dependencies": {
+    "mssql": "^10.0.2",
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "zod": "^3.23.8"
+  }
+}
