@@ -142,7 +142,7 @@ async function connectDatabase(config) {
   } catch (error) {
     connectionStats.totalConnections++;
     connectionStats.failedConnections++;
-    console.error(`❌ 连接数据库失败: ${error.message}`);
+    console.log(`❌ 连接数据库失败: ${error.message}`);
     throw error;
   }
 }
@@ -168,7 +168,7 @@ async function disconnectDatabase() {
     }
     return false;
   } catch (error) {
-    console.error(`❌ 断开连接失败: ${error.message}`);
+    console.log(`❌ 断开连接失败: ${error.message}`);
     throw error;
   }
 }
@@ -186,7 +186,7 @@ async function reconnectIfNeeded() {
       await connectDatabase(connectionConfig);
       return true;
     } catch (error) {
-      console.error("❌ 重新连接失败:", error.message);
+      console.log("❌ 重新连接失败:", error.message);
       return false;
     }
   }
@@ -239,7 +239,7 @@ async function executeQuery(sqlText, params = []) {
     connectionStats.totalQueries++;
     connectionStats.failedQueries++;
     
-    console.error(`❌ 执行SQL失败: ${error.message}`);
+    console.log(`❌ 执行SQL失败: ${error.message}`);
     throw error;
   }
 }
@@ -636,7 +636,7 @@ const transport = new StdioServerTransport();
     await server.connect(transport);
     console.log("🚀 MCP MSSQL 服务器已启动");
   } catch (error) {
-    console.error("❌ 启动服务器失败:", error);
+    console.log("❌ 启动服务器失败:", error);
     process.exit(1);
   }
 }
