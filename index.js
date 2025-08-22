@@ -1,17 +1,44 @@
 #!/usr/bin/env node
-// 导入 MCP (Model Context Protocol) Server 类，用于创建 MCP 服务
+/**
+ * MCP-MSSQL SQL Server数据库服务器
+ * 
+ * 这是一个专业的SQL Server数据库管理工具，提供完整的数据库操作接口：
+ * 1. sql_connect - 数据库连接管理（连接/断开/状态检查）
+ * 2. sql_execute - SQL查询执行（支持查询和修改操作）
+ * 3. sql_batch - 批量SQL执行（事务支持）
+ * 4. sql_schema - 数据库结构查询（表、视图、存储过程等）
+ * 5. sql_export - 数据导出功能（CSV、JSON格式）
+ * 
+ * 核心功能：
+ * - 连接池管理：智能连接池，自动管理连接生命周期
+ * - 事务支持：完整的ACID事务处理
+ * - 查询优化：智能查询分析和性能监控
+ * - 安全控制：参数化查询，防止SQL注入
+ * - 错误处理：详细的错误信息和状态码
+ * 
+ * 高级特性：
+ * - 自动重连：连接断开时自动重连
+ * - 心跳检测：定期检查连接健康状态
+ * - 超时控制：可配置的查询和连接超时
+ * - 统计监控：完整的操作统计和性能指标
+ * - 批量操作：支持大量数据的批量处理
+ * 
+ * 使用场景：
+ * - 数据库管理：日常数据库维护和监控
+ * - 数据分析：执行复杂查询和报表生成
+ * - 应用开发：数据库驱动的应用开发
+ * - 数据迁移：数据库结构和数据迁移
+ * - 性能调优：查询性能分析和优化
+ */
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-// 导入 StdioServerTransport 类，用于通过标准输入/输出 (stdio) 进行通信
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-// 导入 zod 库，用于定义和验证数据 schema (输入参数的类型和结构)
 import { z } from "zod";
-// 导入 MSSQL 驱动
 import sql from 'mssql';
 
-// 创建一个 MCP 服务器实例
 const server = new McpServer({
-  name: "mssql-server", // 服务器名称
-  version: "1.0.0"     // 服务器版本
+  name: "mssql-server",
+  version: "1.0.0"
 });
 
 // 连接池管理
