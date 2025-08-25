@@ -31,7 +31,7 @@
  * - 性能调优：查询性能分析和优化
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import sql from 'mssql';
@@ -655,6 +655,492 @@ server.registerTool("get_connection_status", {
     ]
   };
 });
+
+// 注册配置资源
+server.registerResource(
+  "config",
+  "config://mssql",
+  {
+    title: "MSSQL服务器配置信息",
+    description: "MSSQL服务器的配置信息和功能说明",
+    mimeType: "application/json"
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      text: JSON.stringify({
+        serverName: "MCP MSSQL 服务器",
+        version: "1.0.0",
+        supportedTools: [
+          "connect_database",
+          "execute_sql", 
+          "batch_execute_sql",
+          "disconnect_database",
+          "get_connection_status"
+        ],
+        features: [
+          "智能连接池管理",
+          "自动重连机制",
+          "心跳检测",
+          "事务支持",
+          "参数化查询",
+          "批量SQL执行",
+          "连接统计监控",
+          "自动断开管理"
+        ],
+        resourceTemplates: {
+          "数据库结构查询": {
+            uri: "schema://{database}/{objectType}",
+            description: "查询数据库结构信息",
+            parameters: {
+              database: "数据库名称",
+              objectType: "对象类型：tables(表), views(视图), procedures(存储过程), functions(函数)"
+            },
+            examples: [
+              "schema://master/tables - 查看master数据库的所有表",
+              "schema://AdventureWorks/views - 查看AdventureWorks数据库的所有视图",
+              "schema://Northwind/procedures - 查看Northwind数据库的所有存储过程"
+            ]
+          },
+          "查询历史记录": {
+            uri: "history://{queryType}/{date}",
+            description: "查看SQL查询历史记录",
+            parameters: {
+              queryType: "查询类型：select(查询), insert(插入), update(更新), delete(删除)",
+              date: "日期格式：YYYY-MM-DD"
+            },
+            examples: [
+              "history://select/2024-01-15 - 查看2024年1月15日的查询记录",
+              "history://insert/2024-01-16 - 查看2024年1月16日的插入记录"
+            ]
+          }
+        },
+        connectionSettings: {
+          defaultPort: 1433,
+          defaultEncrypt: true,
+          defaultRequestTimeout: 30000,
+          defaultConnectionTimeout: 30000,
+          maxPoolSize: 10,
+          minPoolSize: 1,
+          idleTimeout: 600000
+        }
+      }, null, 2)
+    }]
+  })
+);
+
+// 注册动态数据库结构资源（使用Resource Template）
+server.registerResource(
+  "database-schema",
+  new ResourceTemplate("schema://{database}/{objectType}", { 
+    list: undefined,
+    complete: {
+      database: (value) => {
+        // 这里可以根据实际连接的数据库返回数据库列表
+        return ["master", "tempdb", "model", "msdb"];
+      },
+      objectType: (value) => {
+        return ["tables", "views", "procedures", "functions", "triggers", "indexes"].filter(type => type.startsWith(value));
+      }
+    }
+  }),
+  {
+    title: "数据库结构信息",
+    description: "查询数据库结构信息，包括表、视图、存储过程等。URI格式：schema://{数据库名}/{对象类型}",
+    mimeType: "application/json"
+  },
+  async (uri, { database, objectType }) => {
+    // 检查连接状态
+    if (!isConnectionActive()) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify({
+            error: "未连接到数据库",
+            message: "请先使用 connect_database 工具建立数据库连接",
+            uri: uri.href,
+            database: database,
+            objectType: objectType
+          }, null, 2)
+        }]
+      };
+    }
+    
+    try {
+      let query = "";
+      let description = "";
+      
+      switch (objectType) {
+        case "tables":
+          query = `
+            SELECT 
+              TABLE_SCHEMA as schema_name,
+              TABLE_NAME as table_name,
+              TABLE_TYPE as table_type
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_CATALOG = @database
+            ORDER BY TABLE_SCHEMA, TABLE_NAME
+          `;
+          description = "数据表";
+          break;
+        case "views":
+          query = `
+            SELECT 
+              TABLE_SCHEMA as schema_name,
+              TABLE_NAME as view_name,
+              'VIEW' as object_type
+            FROM INFORMATION_SCHEMA.VIEWS 
+            WHERE TABLE_CATALOG = @database
+            ORDER BY TABLE_SCHEMA, TABLE_NAME
+          `;
+          description = "视图";
+          break;
+        case "procedures":
+          query = `
+            SELECT 
+              ROUTINE_SCHEMA as schema_name,
+              ROUTINE_NAME as procedure_name,
+              ROUTINE_TYPE as object_type
+            FROM INFORMATION_SCHEMA.ROUTINES 
+            WHERE ROUTINE_CATALOG = @database
+            ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME
+          `;
+          description = "存储过程";
+          break;
+        case "functions":
+          query = `
+            SELECT 
+              ROUTINE_SCHEMA as schema_name,
+              ROUTINE_NAME as function_name,
+              ROUTINE_TYPE as object_type
+            FROM INFORMATION_SCHEMA.ROUTINES 
+            WHERE ROUTINE_CATALOG = @database AND ROUTINE_TYPE = 'FUNCTION'
+            ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME
+          `;
+          description = "函数";
+          break;
+        case "triggers":
+          query = `
+            SELECT 
+              TRIGGER_SCHEMA as schema_name,
+              TRIGGER_NAME as trigger_name,
+              'TRIGGER' as object_type
+            FROM INFORMATION_SCHEMA.ROUTINES 
+            WHERE ROUTINE_CATALOG = @database AND ROUTINE_TYPE = 'TRIGGER'
+            ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME
+          `;
+          description = "触发器";
+          break;
+        case "indexes":
+          query = `
+            SELECT 
+              s.name as schema_name,
+              t.name as table_name,
+              i.name as index_name,
+              i.type_desc as index_type
+            FROM sys.indexes i
+            INNER JOIN sys.tables t ON i.object_id = t.object_id
+            INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE t.is_ms_shipped = 0
+            ORDER BY s.name, t.name, i.name
+          `;
+          description = "索引";
+          break;
+        default:
+          return {
+            contents: [{
+              uri: uri.href,
+              text: JSON.stringify({
+                error: "不支持的对象类型",
+                message: `不支持的对象类型: ${objectType}`,
+                supportedTypes: ["tables", "views", "procedures", "functions", "triggers", "indexes"],
+                uri: uri.href,
+                database: database,
+                objectType: objectType
+              }, null, 2)
+            }]
+          };
+      }
+      
+      // 执行查询
+      const request = connectionPool.request();
+      request.input('database', sql.VarChar, database);
+      const result = await request.query(query);
+      
+      const schemaData = {
+        database: database,
+        objectType: objectType,
+        description: description,
+        count: result.recordset.length,
+        objects: result.recordset,
+        queryTime: new Date().toISOString(),
+        uri: uri.href
+      };
+      
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify(schemaData, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify({
+            error: "查询失败",
+            message: error.message,
+            uri: uri.href,
+            database: database,
+            objectType: objectType
+          }, null, 2)
+        }]
+      };
+    }
+  }
+);
+
+// 注册查询历史记录资源（使用Resource Template）
+server.registerResource(
+  "query-history",
+  new ResourceTemplate("history://{queryType}/{date}", { 
+    list: undefined,
+    complete: {
+      queryType: (value) => {
+        return ["select", "insert", "update", "delete", "all"].filter(type => type.startsWith(value));
+      },
+      date: (value) => {
+        // 返回最近7天的日期建议
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          date.setDate(date.getDate() - i);
+          dates.push(date.toISOString().split('T')[0]);
+        }
+        return dates.filter(d => d.startsWith(value));
+      }
+    }
+  }),
+  {
+    title: "SQL查询历史记录",
+    description: "查看SQL查询历史记录。URI格式：history://{查询类型}/{日期}",
+    mimeType: "application/json"
+  },
+  async (uri, { queryType, date }) => {
+    // 模拟查询历史数据
+    const historyData = {
+      queryType: queryType,
+      date: date,
+      totalQueries: 0,
+      successfulQueries: 0,
+      failedQueries: 0,
+      averageQueryTime: 0,
+      queries: [],
+      uri: uri.href
+    };
+    
+    // 根据查询类型生成模拟数据
+    if (queryType === "all" || queryType === "select") {
+      historyData.queries.push({
+        time: "09:15:30",
+        sql: "SELECT * FROM Users WHERE status = 'active'",
+        duration: 45,
+        rowsReturned: 156,
+        status: "success"
+      });
+      historyData.queries.push({
+        time: "14:22:15",
+        sql: "SELECT COUNT(*) FROM Orders WHERE order_date >= '2024-01-01'",
+        duration: 23,
+        rowsReturned: 1,
+        status: "success"
+      });
+    }
+    
+    if (queryType === "all" || queryType === "insert") {
+      historyData.queries.push({
+        time: "10:30:45",
+        sql: "INSERT INTO Logs (message, timestamp) VALUES ('User login', GETDATE())",
+        duration: 12,
+        rowsAffected: 1,
+        status: "success"
+      });
+    }
+    
+    if (queryType === "all" || queryType === "update") {
+      historyData.queries.push({
+        time: "16:45:20",
+        sql: "UPDATE Products SET price = price * 1.1 WHERE category = 'electronics'",
+        duration: 67,
+        rowsAffected: 23,
+        status: "success"
+      });
+    }
+    
+    if (queryType === "all" || queryType === "delete") {
+      historyData.queries.push({
+        time: "11:20:10",
+        sql: "DELETE FROM TempData WHERE created_date < DATEADD(day, -30, GETDATE())",
+        duration: 89,
+        rowsAffected: 156,
+        status: "success"
+      });
+    }
+    
+    // 计算统计信息
+    historyData.totalQueries = historyData.queries.length;
+    historyData.successfulQueries = historyData.queries.filter(q => q.status === "success").length;
+    historyData.failedQueries = historyData.queries.filter(q => q.status === "failed").length;
+    historyData.averageQueryTime = historyData.queries.length > 0 
+      ? Math.round(historyData.queries.reduce((sum, q) => sum + q.duration, 0) / historyData.queries.length)
+      : 0;
+    
+    return {
+      contents: [{
+        uri: uri.href,
+        text: JSON.stringify(historyData, null, 2)
+      }]
+    };
+  }
+);
+
+// 注册帮助资源
+server.registerResource(
+  "help",
+  "help://mssql-resources",
+  {
+    title: "MSSQL资源使用帮助",
+    description: "详细说明如何使用MSSQL服务器的各种资源",
+    mimeType: "text/plain"
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      text: `MSSQL服务器资源使用说明
+==============================
+
+1. 配置信息 (config)
+   URI: config://mssql
+   说明: 查看服务器配置、支持的工具和功能特性
+
+2. 数据库结构查询 (database-schema)
+   URI模板: schema://{database}/{objectType}
+   
+   参数说明:
+   - {database}: 数据库名称
+     * master, tempdb, model, msdb (系统数据库)
+     * 或其他用户数据库名称
+   - {objectType}: 对象类型
+     * tables = 数据表
+     * views = 视图
+     * procedures = 存储过程
+     * functions = 函数
+     * triggers = 触发器
+     * indexes = 索引
+   
+   使用示例:
+   - schema://master/tables     (查看master数据库的所有表)
+   - schema://AdventureWorks/views (查看AdventureWorks数据库的所有视图)
+   - schema://Northwind/procedures (查看Northwind数据库的所有存储过程)
+
+3. 查询历史记录 (query-history)
+   URI模板: history://{queryType}/{date}
+   
+   参数说明:
+   - {queryType}: 查询类型
+     * select = 查询操作
+     * insert = 插入操作
+     * update = 更新操作
+     * delete = 删除操作
+     * all = 所有操作
+   - {date}: 日期 (YYYY-MM-DD格式)
+   
+   使用示例:
+   - history://select/2024-01-15 (查看2024年1月15日的查询记录)
+   - history://insert/2024-01-16 (查看2024年1月16日的插入记录)
+   - history://all/2024-01-17     (查看2024年1月17日的所有操作记录)
+
+4. 如何访问:
+   在MCP Inspector中，点击Resources标签，然后输入完整的URI即可。
+   例如: schema://master/tables
+
+5. 注意事项:
+   - 数据库结构查询需要先建立数据库连接
+   - 查询历史记录目前提供模拟数据
+   - 所有资源都支持JSON格式输出
+   - 使用Resource Template可以实现动态URI补全
+`
+    }]
+  })
+);
+
+// 注册SQL查询助手提示词
+server.registerPrompt(
+  "sql-query-assistant",
+  {
+    title: "SQL查询助手",
+    description: "帮助用户编写和优化SQL查询语句",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      table: z.string().optional().describe("目标表名（可选）"),
+      operation: z.enum(["select", "insert", "update", "delete", "create", "alter", "drop"]).describe("操作类型"),
+      description: z.string().describe("要执行的操作描述")
+    }
+  },
+  ({ database, table, operation, description }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `请帮我编写一个SQL ${operation}语句，用于在${database}数据库中${description}${table ? `，涉及表：${table}` : ''}。
+
+要求：
+1. 使用标准的T-SQL语法
+2. 包含适当的错误处理
+3. 考虑性能优化
+4. 添加必要的注释
+5. 如果涉及参数，请使用参数化查询防止SQL注入
+
+请提供完整的SQL语句和说明。`
+      }
+    }]
+  })
+);
+
+// 注册数据库性能优化提示词
+server.registerPrompt(
+  "database-performance-optimizer",
+  {
+    title: "数据库性能优化助手",
+    description: "帮助用户分析和优化数据库性能问题",
+    argsSchema: {
+      issue: z.string().describe("性能问题描述"),
+      database: z.string().optional().describe("目标数据库名称（可选）"),
+      query: z.string().optional().describe("具体的SQL查询语句（可选）")
+    }
+  },
+  ({ issue, database, query }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我遇到了数据库性能问题：${issue}${database ? `，涉及数据库：${database}` : ''}${query ? `，具体查询：${query}` : ''}。
+
+请帮我分析可能的原因并提供优化建议：
+
+1. 查询性能分析
+2. 索引优化建议
+3. 表结构优化
+4. 连接池配置优化
+5. 查询重写建议
+6. 监控和诊断方法
+
+请提供详细的优化方案和具体的实施步骤。`
+      }
+    }]
+  })
+);
 
 // 启动服务器
 async function startServer() {
