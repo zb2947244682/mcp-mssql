@@ -1142,6 +1142,997 @@ server.registerPrompt(
   })
 );
 
+// 注册数据库备份和恢复提示词
+server.registerPrompt(
+  "database-backup-restore",
+  {
+    title: "数据库备份恢复助手",
+    description: "帮助用户制定数据库备份和恢复策略",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      operation: z.enum(["backup", "restore", "strategy"]).describe("操作类型：backup(备份), restore(恢复), strategy(策略)"),
+      requirements: z.string().describe("具体需求描述，如备份频率、保留策略、恢复时间要求等")
+    }
+  },
+  ({ database, operation, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库制定${operation === 'backup' ? '备份' : operation === 'restore' ? '恢复' : '备份恢复'}策略。
+
+具体需求：${requirements}
+
+请提供：
+1. 详细的${operation === 'backup' ? '备份' : operation === 'restore' ? '恢复' : '备份和恢复'}脚本
+2. 最佳实践建议
+3. 自动化方案
+4. 监控和验证方法
+5. 常见问题解决方案
+
+请使用标准的T-SQL语法，并考虑生产环境的安全性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库安全审计提示词
+server.registerPrompt(
+  "database-security-audit",
+  {
+    title: "数据库安全审计助手",
+    description: "帮助用户进行数据库安全审计和权限管理",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      auditType: z.enum(["permissions", "access", "compliance", "vulnerability"]).describe("审计类型"),
+      scope: z.string().describe("审计范围描述")
+    }
+  },
+  ({ database, auditType, scope }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要对${database}数据库进行${auditType === 'permissions' ? '权限' : auditType === 'access' ? '访问' : auditType === 'compliance' ? '合规性' : '漏洞'}审计。
+
+审计范围：${scope}
+
+请提供：
+1. 详细的审计查询脚本
+2. 安全评估报告模板
+3. 权限优化建议
+4. 安全最佳实践
+5. 合规性检查清单
+6. 风险缓解措施
+
+请确保所有查询都考虑安全性，避免信息泄露。`
+      }
+    }]
+  })
+);
+
+// 注册数据迁移助手提示词
+server.registerPrompt(
+  "data-migration-assistant",
+  {
+    title: "数据迁移助手",
+    description: "帮助用户规划和执行数据库迁移任务",
+    argsSchema: {
+      sourceDatabase: z.string().describe("源数据库名称"),
+      targetDatabase: z.string().describe("目标数据库名称"),
+      migrationType: z.enum(["schema", "data", "full", "incremental"]).describe("迁移类型"),
+      constraints: z.string().describe("迁移约束条件，如停机时间、数据一致性要求等")
+    }
+  },
+  ({ sourceDatabase, targetDatabase, migrationType, constraints }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要将${sourceDatabase}数据库迁移到${targetDatabase}数据库。
+
+迁移类型：${migrationType === 'schema' ? '结构' : migrationType === 'data' ? '数据' : migrationType === 'full' ? '完整' : '增量'}迁移
+
+约束条件：${constraints}
+
+请提供：
+1. 详细的迁移计划
+2. 迁移脚本和工具
+3. 数据验证方法
+4. 回滚策略
+5. 性能优化建议
+6. 风险控制措施
+7. 迁移后验证清单
+
+请考虑数据完整性、性能和最小化停机时间。`
+      }
+    }]
+  })
+);
+
+// 注册数据库监控和告警提示词
+server.registerPrompt(
+  "database-monitoring-alert",
+  {
+    title: "数据库监控告警助手",
+    description: "帮助用户建立数据库监控和告警系统",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      monitoringScope: z.enum(["performance", "availability", "security", "comprehensive"]).describe("监控范围"),
+      alertLevels: z.string().describe("告警级别和阈值要求")
+    }
+  },
+  ({ database, monitoringScope, alertLevels }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库建立${monitoringScope === 'performance' ? '性能' : monitoringScope === 'availability' ? '可用性' : monitoringScope === 'security' ? '安全' : '综合'}监控和告警系统。
+
+告警要求：${alertLevels}
+
+请提供：
+1. 关键性能指标(KPI)定义
+2. 监控查询脚本
+3. 告警阈值设置
+4. 告警通知机制
+5. 性能基线建立方法
+6. 趋势分析报告
+7. 自动化响应建议
+
+请确保监控系统本身不会对数据库性能造成影响。`
+      }
+    }]
+  })
+);
+
+// 注册数据库索引优化提示词
+server.registerPrompt(
+  "index-optimization-assistant",
+  {
+    title: "索引优化助手",
+    description: "帮助用户分析和优化数据库索引",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      table: z.string().optional().describe("目标表名（可选）"),
+      optimizationGoal: z.enum(["performance", "maintenance", "storage", "comprehensive"]).describe("优化目标")
+    }
+  },
+  ({ database, table, optimizationGoal }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要优化${database}数据库${table ? `中${table}表` : ''}的索引。
+
+优化目标：${optimizationGoal === 'performance' ? '性能提升' : optimizationGoal === 'maintenance' ? '维护优化' : optimizationGoal === 'storage' ? '存储优化' : '综合优化'}
+
+请提供：
+1. 索引使用情况分析脚本
+2. 缺失索引建议
+3. 冗余索引识别
+4. 索引碎片整理方法
+5. 性能测试方案
+6. 索引维护计划
+7. 最佳实践建议
+
+请考虑查询模式、数据分布和更新频率。`
+      }
+    }]
+  })
+);
+
+// 注册数据库分区策略提示词
+server.registerPrompt(
+  "database-partitioning-strategy",
+  {
+    title: "数据库分区策略助手",
+    description: "帮助用户设计和实施数据库分区策略",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      table: z.string().describe("目标表名"),
+      partitionType: z.enum(["range", "hash", "list", "composite"]).describe("分区类型"),
+      requirements: z.string().describe("分区需求，如数据量、查询模式、维护要求等")
+    }
+  },
+  ({ database, table, partitionType, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库中的${table}表设计${partitionType === 'range' ? '范围' : partitionType === 'hash' ? '哈希' : partitionType === 'list' ? '列表' : '复合'}分区策略。
+
+分区需求：${requirements}
+
+请提供：
+1. 分区键选择建议
+2. 分区函数和方案设计
+3. 分区创建脚本
+4. 数据迁移策略
+5. 查询优化建议
+6. 维护和监控方案
+7. 性能测试方法
+8. 最佳实践指导
+
+请考虑数据分布、查询性能和维护便利性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库高可用性配置提示词
+server.registerPrompt(
+  "database-high-availability",
+  {
+    title: "数据库高可用性配置助手",
+    description: "帮助用户配置数据库高可用性解决方案",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      haType: z.enum(["alwayson", "mirroring", "replication", "clustering"]).describe("高可用性类型"),
+      requirements: z.string().describe("高可用性要求，如RTO、RPO、故障转移时间等")
+    }
+  },
+  ({ database, haType, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库配置${haType === 'alwayson' ? 'Always On可用性组' : haType === 'mirroring' ? '数据库镜像' : haType === 'replication' ? '复制' : '故障转移集群'}高可用性解决方案。
+
+高可用性要求：${requirements}
+
+请提供：
+1. 架构设计建议
+2. 配置步骤和脚本
+3. 网络和存储要求
+4. 故障转移测试方案
+5. 监控和告警配置
+6. 性能影响评估
+7. 维护和故障排除指南
+8. 最佳实践建议
+
+请确保解决方案满足业务连续性要求。`
+      }
+    }]
+  })
+);
+
+// 注册数据库性能调优提示词
+server.registerPrompt(
+  "database-performance-tuning",
+  {
+    title: "数据库性能调优助手",
+    description: "帮助用户进行全面的数据库性能调优",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      performanceIssue: z.string().describe("性能问题描述"),
+      tuningScope: z.enum(["query", "index", "configuration", "comprehensive"]).describe("调优范围")
+    }
+  },
+  ({ database, performanceIssue, tuningScope }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要调优${database}数据库的性能。
+
+性能问题：${performanceIssue}
+
+调优范围：${tuningScope === 'query' ? '查询优化' : tuningScope === 'index' ? '索引优化' : tuningScope === 'configuration' ? '配置优化' : '综合调优'}
+
+请提供：
+1. 性能诊断方法
+2. 瓶颈识别工具
+3. 优化建议和脚本
+4. 配置参数调优
+5. 查询重写建议
+6. 性能测试方案
+7. 监控指标设置
+8. 持续优化策略
+
+请提供可量化的性能改进预期。`
+      }
+    }]
+  })
+);
+
+// 注册数据库维护计划提示词
+server.registerPrompt(
+  "database-maintenance-plan",
+  {
+    title: "数据库维护计划助手",
+    description: "帮助用户制定数据库维护计划",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      maintenanceType: z.enum(["daily", "weekly", "monthly", "comprehensive"]).describe("维护类型"),
+      requirements: z.string().describe("维护要求，如维护窗口、自动化程度等")
+    }
+  },
+  ({ database, maintenanceType, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库制定${maintenanceType === 'daily' ? '日常' : maintenanceType === 'weekly' ? '每周' : maintenanceType === 'monthly' ? '每月' : '综合'}维护计划。
+
+维护要求：${requirements}
+
+请提供：
+1. 维护任务清单
+2. 自动化脚本
+3. 维护窗口安排
+4. 性能监控方案
+5. 备份和恢复策略
+6. 日志清理策略
+7. 统计信息更新
+8. 维护报告模板
+9. 异常处理流程
+
+请确保维护活动不影响业务运行。`
+      }
+    }]
+  })
+);
+
+// 注册数据库容量规划提示词
+server.registerPrompt(
+  "database-capacity-planning",
+  {
+    title: "数据库容量规划助手",
+    description: "帮助用户进行数据库容量规划和预测",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      planningHorizon: z.enum(["short", "medium", "long"]).describe("规划周期：短期(3-6月)、中期(6-12月)、长期(1-3年)"),
+      growthFactors: z.string().describe("增长因素，如用户增长、数据增长、业务扩展等")
+    }
+  },
+  ({ database, planningHorizon, growthFactors }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库进行${planningHorizon === 'short' ? '短期' : planningHorizon === 'medium' ? '中期' : '长期'}容量规划。
+
+增长因素：${growthFactors}
+
+请提供：
+1. 容量评估方法
+2. 增长趋势分析
+3. 资源需求预测
+4. 扩展方案建议
+5. 成本估算
+6. 风险评估
+7. 监控指标
+8. 预警机制
+9. 实施时间表
+
+请考虑技术可行性和成本效益。`
+      }
+    }]
+  })
+);
+
+// 注册数据库灾难恢复提示词
+server.registerPrompt(
+  "database-disaster-recovery",
+  {
+    title: "数据库灾难恢复助手",
+    description: "帮助用户制定数据库灾难恢复计划",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      recoveryType: z.enum(["rto", "rpo", "comprehensive"]).describe("恢复类型：RTO(恢复时间目标)、RPO(恢复点目标)、综合"),
+      disasterScenarios: z.string().describe("灾难场景描述")
+    }
+  },
+  ({ database, recoveryType, disasterScenarios }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库制定灾难恢复计划。
+
+恢复类型：${recoveryType === 'rto' ? 'RTO(恢复时间目标)' : recoveryType === 'rpo' ? 'RPO(恢复点目标)' : '综合灾难恢复'}
+
+灾难场景：${disasterScenarios}
+
+请提供：
+1. 风险评估和影响分析
+2. 恢复策略设计
+3. 备份和复制方案
+4. 恢复流程和脚本
+5. 测试和验证方法
+6. 人员培训和演练
+7. 文档和流程
+8. 持续改进计划
+
+请确保恢复计划的可执行性和有效性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库合规性检查提示词
+server.registerPrompt(
+  "database-compliance-checker",
+  {
+    title: "数据库合规性检查助手",
+    description: "帮助用户进行数据库合规性检查和报告",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      complianceStandard: z.string().describe("合规标准，如GDPR、SOX、PCI-DSS等"),
+      checkScope: z.string().describe("检查范围描述")
+    }
+  },
+  ({ database, complianceStandard, checkScope }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要检查${database}数据库是否符合${complianceStandard}合规标准。
+
+检查范围：${checkScope}
+
+请提供：
+1. 合规性检查清单
+2. 自动化检查脚本
+3. 数据分类和标记
+4. 访问控制审计
+5. 数据加密建议
+6. 审计日志配置
+7. 合规性报告模板
+8. 风险缓解措施
+9. 持续监控方案
+
+请确保检查过程符合相关法规要求。`
+      }
+    }]
+  })
+);
+
+// 注册数据库云迁移提示词
+server.registerPrompt(
+  "database-cloud-migration",
+  {
+    title: "数据库云迁移助手",
+    description: "帮助用户规划和执行数据库云迁移",
+    argsSchema: {
+      sourceEnvironment: z.string().describe("源环境描述"),
+      targetCloud: z.string().describe("目标云平台"),
+      migrationStrategy: z.enum(["lift-shift", "refactor", "replatform", "rebuild"]).describe("迁移策略")
+    }
+  },
+  ({ sourceEnvironment, targetCloud, migrationStrategy }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要将数据库从${sourceEnvironment}迁移到${targetCloud}云平台。
+
+迁移策略：${migrationStrategy === 'lift-shift' ? '直接迁移' : migrationStrategy === 'refactor' ? '重构迁移' : migrationStrategy === 'replatform' ? '平台重构' : '重新构建'}
+
+请提供：
+1. 云平台评估
+2. 迁移路线图
+3. 成本效益分析
+4. 技术架构设计
+5. 数据迁移策略
+6. 性能优化建议
+7. 安全配置
+8. 测试和验证
+9. 回滚计划
+10. 运维转型
+
+请考虑云原生特性和最佳实践。`
+      }
+    }]
+  })
+);
+
+// 注册数据库机器学习集成提示词
+server.registerPrompt(
+  "database-ml-integration",
+  {
+    title: "数据库机器学习集成助手",
+    description: "帮助用户集成机器学习功能到数据库",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      mlFeature: z.enum(["predictive", "anomaly", "classification", "recommendation"]).describe("机器学习功能"),
+      useCase: z.string().describe("具体应用场景描述")
+    }
+  },
+  ({ database, mlFeature, useCase }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要在${database}数据库中集成${mlFeature === 'predictive' ? '预测分析' : mlFeature === 'anomaly' ? '异常检测' : mlFeature === 'classification' ? '分类' : '推荐系统'}机器学习功能。
+
+应用场景：${useCase}
+
+请提供：
+1. 技术架构设计
+2. 数据准备和预处理
+3. 模型选择和训练
+4. 集成方案和API
+5. 性能优化建议
+6. 监控和更新策略
+7. 安全考虑
+8. 部署和运维
+9. 成本估算
+10. 成功指标
+
+请考虑数据库性能和可扩展性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库API设计提示词
+server.registerPrompt(
+  "database-api-designer",
+  {
+    title: "数据库API设计助手",
+    description: "帮助用户设计数据库API接口",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      apiType: z.enum(["rest", "graphql", "grpc", "custom"]).describe("API类型"),
+      requirements: z.string().describe("API需求描述")
+    }
+  },
+  ({ database, apiType, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库设计${apiType === 'rest' ? 'REST' : apiType === 'graphql' ? 'GraphQL' : apiType === 'grpc' ? 'gRPC' : '自定义'}API接口。
+
+API需求：${requirements}
+
+请提供：
+1. API架构设计
+2. 端点设计和路由
+3. 数据模型设计
+4. 认证和授权
+5. 错误处理
+6. 性能优化
+7. 缓存策略
+8. 版本控制
+9. 文档和测试
+10. 监控和日志
+
+请确保API的安全性、性能和可维护性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库微服务架构提示词
+server.registerPrompt(
+  "database-microservices-architect",
+  {
+    title: "数据库微服务架构助手",
+    description: "帮助用户设计数据库微服务架构",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      architectureType: z.enum(["shared", "per-service", "hybrid", "event-driven"]).describe("架构类型"),
+      requirements: z.string().describe("架构需求描述")
+    }
+  },
+  ({ database, architectureType, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要为${database}数据库设计${architectureType === 'shared' ? '共享数据库' : architectureType === 'per-service' ? '服务独立数据库' : architectureType === 'hybrid' ? '混合架构' : '事件驱动'}微服务架构。
+
+架构需求：${requirements}
+
+请提供：
+1. 架构模式选择
+2. 数据一致性策略
+3. 服务边界定义
+4. 数据分片方案
+5. 事务管理
+6. 性能优化
+7. 扩展性设计
+8. 监控和治理
+9. 部署策略
+10. 最佳实践
+
+请考虑数据一致性和服务独立性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库DevOps实践提示词
+server.registerPrompt(
+  "database-devops-practices",
+  {
+    title: "数据库DevOps实践助手",
+    description: "帮助用户实施数据库DevOps实践",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      devopsArea: z.enum(["automation", "ci-cd", "monitoring", "comprehensive"]).describe("DevOps领域"),
+      requirements: z.string().describe("DevOps需求描述")
+    }
+  },
+  ({ database, devopsArea, requirements }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要在${database}数据库中实施${devopsArea === 'automation' ? '自动化' : devopsArea === 'ci-cd' ? 'CI/CD' : devopsArea === 'monitoring' ? '监控' : '综合'}DevOps实践。
+
+DevOps需求：${requirements}
+
+请提供：
+1. 自动化脚本和工具
+2. CI/CD流水线设计
+3. 环境管理策略
+4. 配置管理
+5. 测试自动化
+6. 部署策略
+7. 监控和告警
+8. 日志管理
+9. 安全实践
+10. 团队协作流程
+
+请确保DevOps实践的安全性和可靠性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库成本优化提示词
+server.registerPrompt(
+  "database-cost-optimizer",
+  {
+    title: "数据库成本优化助手",
+    description: "帮助用户优化数据库运营成本",
+    argsSchema: {
+      database: z.string().describe("目标数据库名称"),
+      costArea: z.enum(["licensing", "infrastructure", "operations", "comprehensive"]).describe("成本优化领域"),
+      budget: z.string().describe("预算约束和目标")
+    }
+  },
+  ({ database, costArea, budget }) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: `我需要优化${database}数据库的${costArea === 'licensing' ? '许可' : costArea === 'infrastructure' ? '基础设施' : costArea === 'operations' ? '运营' : '综合'}成本。
+
+预算约束：${budget}
+
+请提供：
+1. 成本分析报告
+2. 优化机会识别
+3. 许可优化建议
+4. 资源利用率提升
+5. 自动化成本节省
+6. 云迁移成本分析
+7. 性能优化成本效益
+8. 长期成本规划
+9. ROI分析
+10. 实施路线图
+
+请确保成本优化不影响系统性能和可靠性。`
+      }
+    }]
+  })
+);
+
+// 注册数据库知识库资源
+server.registerResource(
+  "knowledge-base",
+  "knowledge://mssql-best-practices",
+  {
+    title: "MSSQL最佳实践知识库",
+    description: "SQL Server数据库管理的最佳实践和指南",
+    mimeType: "application/json"
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      text: JSON.stringify({
+        title: "SQL Server最佳实践知识库",
+        version: "1.0.0",
+        categories: {
+          "性能优化": {
+            "查询优化": [
+              "使用参数化查询防止SQL注入",
+              "避免SELECT *，只选择需要的列",
+              "合理使用索引，避免过度索引",
+              "使用EXISTS代替IN进行子查询",
+              "避免在WHERE子句中使用函数"
+            ],
+            "索引管理": [
+              "定期重建和重组索引",
+              "监控索引使用情况",
+              "删除未使用的索引",
+              "使用覆盖索引优化查询",
+              "考虑索引的维护成本"
+            ],
+            "配置优化": [
+              "调整内存配置参数",
+              "优化tempdb配置",
+              "配置适当的并行度",
+              "调整锁超时设置",
+              "优化统计信息更新频率"
+            ]
+          },
+          "安全最佳实践": {
+            "访问控制": [
+              "使用最小权限原则",
+              "定期审查用户权限",
+              "使用角色管理权限",
+              "实施行级安全性",
+              "加密敏感数据"
+            ],
+            "审计和监控": [
+              "启用SQL Server审计",
+              "监控异常访问模式",
+              "记录所有管理操作",
+              "定期审查安全日志",
+              "实施实时告警"
+            ]
+          },
+          "高可用性": {
+            "备份策略": [
+              "实施完整、差异和事务日志备份",
+              "测试备份恢复流程",
+              "使用压缩减少备份大小",
+              "实施备份验证",
+              "考虑异地备份存储"
+            ],
+            "灾难恢复": [
+              "制定RTO和RPO目标",
+              "实施Always On可用性组",
+              "定期进行灾难恢复演练",
+              "监控复制延迟",
+              "准备回滚计划"
+            ]
+          },
+          "维护和监控": {
+            "日常维护": [
+              "定期更新统计信息",
+              "检查数据库完整性",
+              "清理历史数据",
+              "优化日志文件",
+              "监控磁盘空间"
+            ],
+            "性能监控": [
+              "使用DMV监控性能",
+              "设置性能基线",
+              "监控等待统计",
+              "跟踪慢查询",
+              "分析执行计划"
+            ]
+          }
+        },
+        resources: {
+          "官方文档": "https://docs.microsoft.com/en-us/sql/sql-server/",
+          "社区论坛": "https://dba.stackexchange.com/questions/tagged/sql-server",
+          "性能调优指南": "https://docs.microsoft.com/en-us/sql/relational-databases/performance/",
+          "安全最佳实践": "https://docs.microsoft.com/en-us/sql/relational-databases/security/"
+        }
+      }, null, 2)
+    }]
+  })
+);
+
+// 注册数据库故障排除资源
+server.registerResource(
+  "troubleshooting-guide",
+  "troubleshooting://mssql-common-issues",
+  {
+    title: "MSSQL常见问题故障排除指南",
+    description: "SQL Server常见问题的诊断和解决方案",
+    mimeType: "application/json"
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      text: JSON.stringify({
+        title: "SQL Server常见问题故障排除指南",
+        version: "1.0.0",
+        commonIssues: {
+          "连接问题": {
+            "症状": "无法连接到数据库服务器",
+            "可能原因": [
+              "SQL Server服务未启动",
+              "网络连接问题",
+              "防火墙阻止连接",
+              "端口配置错误",
+              "认证失败"
+            ],
+            "诊断步骤": [
+              "检查SQL Server服务状态",
+              "验证网络连接",
+              "检查防火墙设置",
+              "确认端口配置",
+              "验证登录凭据"
+            ],
+            "解决方案": [
+              "启动SQL Server服务",
+              "修复网络连接",
+              "修复网络连接",
+              "配置防火墙规则",
+              "更正端口设置",
+              "重置密码或修复认证"
+            ]
+          },
+          "性能问题": {
+            "症状": "查询执行缓慢，系统响应慢",
+            "可能原因": [
+              "缺少适当的索引",
+              "统计信息过期",
+              "内存不足",
+              "磁盘I/O瓶颈",
+              "锁等待"
+            ],
+            "诊断步骤": [
+              "分析执行计划",
+              "检查索引使用情况",
+              "监控内存使用",
+              "分析I/O统计",
+              "检查锁等待"
+            ],
+            "解决方案": [
+              "创建缺失的索引",
+              "更新统计信息",
+              "增加内存配置",
+              "优化磁盘配置",
+              "优化事务设计"
+            ]
+          },
+          "空间问题": {
+            "症状": "数据库空间不足，无法插入数据",
+            "可能原因": [
+              "数据文件空间不足",
+              "日志文件空间不足",
+              "tempdb空间不足",
+              "自动增长设置不当"
+            ],
+            "诊断步骤": [
+              "检查数据文件空间",
+              "检查日志文件空间",
+              "检查tempdb空间",
+              "查看自动增长设置"
+            ],
+            "解决方案": [
+              "增加数据文件大小",
+              "清理日志文件",
+              "优化tempdb配置",
+              "调整自动增长设置"
+            ]
+          },
+          "备份问题": {
+            "症状": "备份失败或备份文件损坏",
+            "可能原因": [
+              "磁盘空间不足",
+              "权限问题",
+              "网络连接问题",
+              "备份设备问题"
+            ],
+            "诊断步骤": [
+              "检查磁盘空间",
+              "验证备份权限",
+              "测试网络连接",
+              "检查备份设备"
+            ],
+            "解决方案": [
+              "清理磁盘空间",
+              "修复权限设置",
+              "修复网络连接",
+              "更换备份设备"
+            ]
+          }
+        },
+        diagnosticTools: [
+          "SQL Server Profiler",
+          "Extended Events",
+          "Dynamic Management Views (DMVs)",
+          "Performance Monitor",
+          "SQL Server Management Studio"
+        ],
+        emergencyProcedures: [
+          "立即停止问题查询",
+          "重启SQL Server服务",
+          "切换到备用服务器",
+          "回滚到最近的备份",
+          "联系技术支持"
+        ]
+      }, null, 2)
+    }]
+  })
+);
+
+// 注册数据库学习资源
+server.registerResource(
+  "learning-resources",
+  "learning://mssql-tutorials",
+  {
+    title: "MSSQL学习资源",
+    description: "SQL Server学习和培训资源",
+    mimeType: "application/json"
+  },
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      text: JSON.stringify({
+        title: "SQL Server学习资源",
+        version: "1.0.0",
+        learningPaths: {
+          "初学者": {
+            "基础概念": [
+              "数据库基础理论",
+              "SQL语言基础",
+              "SQL Server安装和配置",
+              "基本查询操作"
+            ],
+            "推荐资源": [
+              "Microsoft Learn SQL Server基础课程",
+              "SQL Server Tutorial网站",
+              "《SQL Server从入门到精通》",
+              "在线实践环境"
+            ],
+            "学习时间": "2-3个月"
+          },
+          "中级用户": {
+            "进阶技能": [
+              "索引设计和优化",
+              "存储过程和函数",
+              "事务和锁管理",
+              "性能调优基础"
+            ],
+            "推荐资源": [
+              "SQL Server性能调优课程",
+              "高级T-SQL编程指南",
+              "《SQL Server性能调优实战》",
+              "社区技术博客"
+            ],
+            "学习时间": "3-6个月"
+          },
+          "高级用户": {
+            "专业技能": [
+              "高可用性配置",
+              "灾难恢复规划",
+              "安全审计和合规",
+              "云迁移策略"
+            ],
+            "推荐资源": [
+              "SQL Server企业级管理课程",
+              "高可用性解决方案指南",
+              "《SQL Server企业级管理》",
+              "技术会议和研讨会"
+            ],
+            "学习时间": "6-12个月"
+          }
+        },
+        certificationPaths: [
+          "Microsoft Certified: Azure Database Administrator Associate",
+          "Microsoft Certified: Data Analyst Associate",
+          "Microsoft Certified: Azure Data Engineer Associate"
+        ],
+        practicalProjects: [
+          "个人博客数据库设计",
+          "电商网站数据库优化",
+          "企业级数据仓库构建",
+          "云数据库迁移项目"
+        ],
+        communityResources: [
+          "Stack Overflow SQL Server标签",
+          "Reddit r/SQLServer社区",
+          "SQL Server Central论坛",
+          "本地技术用户组"
+        ]
+      }, null, 2)
+    }]
+  })
+);
+
 // 启动服务器
 async function startServer() {
   try {
