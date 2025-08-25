@@ -54,7 +54,7 @@
     "command": "npx",
     "args": [
       "-y",
-      "@zb2947244682/mcp-mssql"
+      "@zb2947244682/mcp-mssql@latest"
     ]
   }
 }
