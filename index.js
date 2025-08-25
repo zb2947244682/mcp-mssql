@@ -76,9 +76,9 @@ async function startHeartbeat() {
         // 执行简单查询保持连接活跃
         await connectionPool.request().query('SELECT 1 as heartbeat');
         updateActivityTime();
-        console.log("💓 心跳检查成功");
+        //console.log("💓 心跳检查成功");
   } catch (error) {
-        console.log("💔 心跳检查失败，连接可能已断开");
+        //console.log("💔 心跳检查失败，连接可能已断开");
         // 不更新活动时间，让自动重连机制处理
       }
     }
@@ -105,7 +105,7 @@ function startAutoDisconnectTimer() {
       const timeSinceLastActivity = now - lastActivityTime;
       
       if (timeSinceLastActivity >= 300000) { // 5分钟无活动
-        console.log("🔄 连接5分钟无活动，自动断开...");
+        //console.log("🔄 连接5分钟无活动，自动断开...");
         await disconnectDatabase();
       } else {
         // 如果还没到时间，继续下一个检查周期
@@ -164,12 +164,12 @@ async function connectDatabase(config) {
     updateActivityTime();
     startHeartbeat(); // 启动心跳机制
     
-    console.log(`✅ 成功连接到数据库: ${config.server}:${sqlConfig.port}/${config.database}`);
+    //console.log(`✅ 成功连接到数据库: ${config.server}:${sqlConfig.port}/${config.database}`);
     return true;
   } catch (error) {
     connectionStats.totalConnections++;
     connectionStats.failedConnections++;
-    console.log(`❌ 连接数据库失败: ${error.message}`);
+    //console.log(`❌ 连接数据库失败: ${error.message}`);
     throw error;
   }
 }
@@ -190,12 +190,12 @@ async function disconnectDatabase() {
       
       stopHeartbeat(); // 停止心跳机制
       
-      console.log("🔌 数据库连接已断开");
+      //console.log("🔌 数据库连接已断开");
       return true;
     }
     return false;
   } catch (error) {
-    console.log(`❌ 断开连接失败: ${error.message}`);
+    //console.log(`❌ 断开连接失败: ${error.message}`);
     throw error;
   }
 }
@@ -208,12 +208,12 @@ function isConnectionActive() {
 // 重新连接数据库
 async function reconnectIfNeeded() {
   if (!isConnectionActive() && connectionConfig) {
-    console.log("🔄 检测到连接断开，尝试重新连接...");
+    //console.log("🔄 检测到连接断开，尝试重新连接...");
     try {
       await connectDatabase(connectionConfig);
       return true;
     } catch (error) {
-      console.log("❌ 重新连接失败:", error.message);
+      //console.log("❌ 重新连接失败:", error.message);
       return false;
     }
   }
@@ -266,7 +266,7 @@ async function executeQuery(sqlText, params = []) {
     connectionStats.totalQueries++;
     connectionStats.failedQueries++;
     
-    console.log(`❌ 执行SQL失败: ${error.message}`);
+    //console.log(`❌ 执行SQL失败: ${error.message}`);
     throw error;
   }
 }
@@ -661,16 +661,16 @@ async function startServer() {
   try {
 const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.log("🚀 MCP MSSQL 服务器已启动");
+    //console.log("🚀 MCP MSSQL 服务器已启动");
   } catch (error) {
-    console.log("❌ 启动服务器失败:", error);
+    //console.log("❌ 启动服务器失败:", error);
     process.exit(1);
   }
 }
 
 // 优雅关闭
 process.on('SIGINT', async () => {
-  console.log("\n🔄 正在关闭服务器...");
+  //console.log("\n🔄 正在关闭服务器...");
   stopHeartbeat();
   if (connectionPool) {
     await disconnectDatabase();
@@ -679,7 +679,7 @@ process.on('SIGINT', async () => {
 });
 
 process.on('SIGTERM', async () => {
-  console.log("\n🔄 正在关闭服务器...");
+  //console.log("\n🔄 正在关闭服务器...");
   stopHeartbeat();
   if (connectionPool) {
     await disconnectDatabase();
